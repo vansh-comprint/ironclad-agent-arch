@@ -8,6 +8,7 @@ tools:
   - Glob
   - Grep
   - Bash
+color: green
 ---
 
 # Test Generator Agent

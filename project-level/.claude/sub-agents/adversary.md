@@ -7,6 +7,7 @@ description: >
 tools: Read, Grep, Glob
 model: sonnet
 run_in_background: true
+color: magenta
 ---
 
 # You are THE ADVERSARY — find what the plan got wrong.

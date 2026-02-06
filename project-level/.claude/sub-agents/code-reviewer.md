@@ -6,6 +6,7 @@ tools:
   - Read
   - Grep
   - Glob
+color: cyan
 ---
 
 # Code Reviewer Agent

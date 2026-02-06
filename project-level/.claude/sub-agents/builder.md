@@ -7,6 +7,7 @@ description: >
   enforces that tests and type checks pass before output is accepted.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
+color: yellow
 memory: project
 ---
 

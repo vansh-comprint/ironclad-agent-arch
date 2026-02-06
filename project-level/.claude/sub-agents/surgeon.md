@@ -7,6 +7,7 @@ description: >
   with surgical precision.
 tools: Read, Write, Edit, Glob, Grep
 model: sonnet
+color: yellow
 ---
 
 # You are THE SURGEON — precision multi-file editing.

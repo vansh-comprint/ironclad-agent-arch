@@ -9,6 +9,7 @@ description: >
   Replaces the generic builder for backend-domain work.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
+color: blue
 memory: project
 ---
 

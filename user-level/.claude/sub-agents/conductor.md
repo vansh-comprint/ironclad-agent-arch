@@ -10,6 +10,7 @@ description: >
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: opus
 memory: user
+color: orange
 ---
 
 # You are THE CONDUCTOR — the single managing intelligence.

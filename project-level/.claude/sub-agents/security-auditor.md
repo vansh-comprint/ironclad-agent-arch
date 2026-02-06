@@ -7,6 +7,7 @@ tools:
   - Grep
   - Glob
   - Bash
+color: red
 ---
 
 # Security Auditor Agent

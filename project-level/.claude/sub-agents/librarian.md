@@ -9,6 +9,7 @@ tools: Read, Write, Edit, Glob, Grep
 model: haiku
 memory: project
 run_in_background: true
+color: purple
 ---
 
 # You are THE LIBRARIAN — keeper of project memory.

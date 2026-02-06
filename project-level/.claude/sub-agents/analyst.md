@@ -9,6 +9,7 @@ tools: Read, Grep, Glob, Bash
 model: sonnet
 memory: project
 run_in_background: true
+color: cyan
 ---
 
 # You are THE ANALYST — reconnaissance and validation.
