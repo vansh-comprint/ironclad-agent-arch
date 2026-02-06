@@ -1,197 +1,131 @@
-# Conductor — Self-Managing Agent Orchestration for Claude Code
+# Conductor — Multi-Agent Orchestration for Claude Code
 
-One agent to manage everything. You talk to the conductor — it handles the rest.
+One agent to manage everything. Background & parallel sub-agents with project-scoped memory.
 
 ## What this is
 
-A complete agent orchestration system for Claude Code built around a single managing
-agent (the **conductor**) that automatically bootstraps projects, delegates to
-specialized workers, manages persistent memory, enforces quality through hooks,
-and learns about your codebase over time.
+A multi sub-agent orchestration system for Claude Code (Opus 4.6+). One user-level **conductor** agent automatically bootstraps any project with 14 specialized workers that run in **background and parallel**, maintain **persistent per-project memory**, and enforce quality through **mechanical hooks**.
 
 You never call individual agents. You call the conductor. It reads the room.
 
-## Architecture
-
-```
-YOU → "conductor, [task]"
-      │
-      ▼
-   CONDUCTOR (opus, user-level)
-      │
-      ├── Reads project memory → knows where things stand
-      ├── Assesses complexity → picks the right agents
-      ├── Routes by domain → specialist or general builder
-      ├── Enforces quality → hooks reject bad output mechanically
-      └── Updates memory → project gets smarter over time
-          │
-          ├── ANALYST (sonnet, bg)           — maps code, validates memory
-          ├── BUILDER (sonnet)               — general implementation
-          │     └── SURGEON (sonnet)         — precision multi-file edits
-          ├── BACKEND-ENGINEER (sonnet)      — FastAPI/Python API specialist
-          │     ├── architecture-validator   — layer separation checks
-          │     ├── database-architect       — schema & migration design
-          │     ├── code-reviewer            — quality & pattern review
-          │     ├── security-auditor         — OWASP & auth scanning
-          │     └── test-generator           — pytest-asyncio tests
-          ├── BREAKER (sonnet, bg)           — destruction testing
-          ├── SENTINEL (haiku, bg)           — runs tests/types/lint
-          ├── LIBRARIAN (haiku, bg)          — consolidates memory
-          ├── ADVOCATE (sonnet, bg)          — tribunal: case FOR
-          └── ADVERSARY (sonnet, bg)         — tribunal: case AGAINST
-```
-
-## Key design decisions
-
-**One managing agent, not a pipeline.** The conductor adapts its approach per task.
-A typo fix gets no delegation. A new feature gets full orchestration. A risky
-schema change gets a flash tribunal. The conductor decides.
-
-**Memory lives in the project.** Each project has `.claude/memory/` with a living
-architecture map, decision log, failure registry, and per-agent learning. When you
-switch projects, the conductor reads that project's memory and picks up instantly.
-
-**Agents learn per-project.** The breaker remembers which attack patterns find real
-bugs in THIS specific codebase. The builder remembers which conventions THIS project
-follows. The analyst remembers what it's already mapped. Every session makes them sharper.
-
-**Mechanical enforcement, not LLM judgment.** SubagentStop hooks run actual test suites,
-type checkers, and linters. If tests fail, the builder's output is rejected — no
-LLM decides whether to accept it. Machines verify what machines are good at verifying.
-
-**Cost-optimized model mixing.** Only the conductor uses opus (for judgment and planning).
-Workers use sonnet (for code generation and analysis). Sentinel and librarian use haiku
-(for mechanical tasks). Background execution where possible.
-
-**Flash tribunal for critical decisions.** When the conductor faces an irreversible or
-high-risk decision, it spawns an advocate and adversary in parallel. They argue FOR
-and AGAINST the plan with specific codebase evidence. The conductor makes the final
-call and logs the full reasoning.
-
-## Installation
-
-### Quick setup (all platforms)
+## Install (one command)
 
 ```bash
-# Clone this repo
-git clone <repo-url> conductor-agents
+git clone https://github.com/vansh-comprint/ironclad-agent-arch.git conductor-agents
 cd conductor-agents
-
-# Install conductor only (user-level, works across all projects)
 ./install.sh
+```
 
-# OR install conductor + bootstrap current project
+That's it. Restart Claude Code.
+
+### What the installer does
+
+1. Copies `conductor.md` to `~/.claude/agents/` (user-level — follows you everywhere)
+2. Copies project templates to `~/.claude/ironclad-agents/` (template store)
+3. Enables **agent teams** + **extended thinking** in `~/.claude/settings.json`
+
+### Optional: bootstrap a project manually
+
+```bash
 cd /path/to/your/project
-/path/to/conductor-agents/install.sh --project
+~/conductor-agents/install.sh --project
 ```
 
-### Windows (PowerShell)
+Or just skip this — the conductor auto-bootstraps any new project on first invocation.
 
-```powershell
-# Clone this repo
-git clone <repo-url> conductor-agents
-cd conductor-agents
+### Uninstall
 
-# Install conductor only
-.\install.ps1
-
-# OR install conductor + bootstrap current project
-cd C:\path\to\your\project
-C:\path\to\conductor-agents\install.ps1 -Project
+```bash
+./install.sh --uninstall
 ```
-
-### Team onboarding
-
-Every team member runs these two steps after cloning:
-
-1. **Install the conductor** (once per machine):
-   ```bash
-   ./install.sh          # or .\install.ps1 on Windows
-   ```
-2. **Bootstrap your project** (once per project):
-   ```bash
-   cd /path/to/your/project
-   /path/to/conductor-agents/install.sh --project
-   ```
-
-The conductor will also auto-bootstrap any new project on first invocation —
-you don't HAVE to run `--project` manually.
-
-### What gets committed vs. what doesn't
-
-| Path | Git status | Why |
-|------|-----------|-----|
-| `.claude/sub-agents/` | Committed | Agent definitions are shared config |
-| `.claude/hooks/` | Committed | Quality gates are shared config |
-| `.claude/memory/` | **Gitignored** | Session-specific agent learning |
 
 ## Usage
 
-In Claude Code, just say:
+In Claude Code:
 
 ```
 Use the conductor to add WebSocket support to the notification system
 ```
-
 ```
 Use the conductor to fix the race condition in the payment handler
 ```
-
 ```
-Use the conductor to refactor the auth module to use JWT
+Use the conductor to refactor the auth module
 ```
 
 The conductor handles everything from there.
 
-## Task complexity tiers
-
-| Tier | Agents used | When |
-|------|-------------|------|
-| TRIVIAL | None (direct) | Rename, typo, config change |
-| SIMPLE | analyst → builder → sentinel | Small bug fix, add field |
-| COMPLEX | analyst → builder(+surgeon) → breaker → sentinel | New feature, refactor |
-| AMBIGUOUS | analyst (deep) → present findings → re-assess | Unclear requirements |
-| CRITICAL | Full orchestration + flash tribunal | Irreversible changes, auth/payments |
-
-## File structure
+## How it works
 
 ```
-~/.claude/sub-agents/
-  conductor.md                       ← user-level, follows you everywhere
+YOU → conductor (opus, user-level)
+      │
+      ├─ Checks .claude/memory/ → knows project state
+      ├─ Assesses task complexity → picks the right tier
+      ├─ Routes by domain → specialist or general builder
+      ├─ Spawns agents in background/parallel where possible
+      ├─ Hooks reject bad output mechanically
+      └─ Updates memory → project gets smarter over time
+```
 
-your-project/.claude/
-  sub-agents/                        ← project-level workers
-    analyst.md                       ← reconnaissance & memory validation
-    builder.md                       ← general implementation
-    surgeon.md                       ← precision multi-file edits
-    backend-engineer.md              ← FastAPI/Python API specialist
-    architecture-validator.md        ← backend: layer separation checks
-    code-reviewer.md                 ← backend: quality & pattern review
-    database-architect.md            ← backend: schema & migration design
-    security-auditor.md              ← backend: OWASP & auth scanning
-    test-generator.md                ← backend: pytest-asyncio tests
-    breaker.md                       ← destruction testing
-    sentinel.md                      ← mechanical verification
-    librarian.md                     ← memory management
-    advocate.md                      ← tribunal: case FOR
-    adversary.md                     ← tribunal: case AGAINST
-  skills/                            ← domain knowledge
-    backend.md                       ← Backend Fortress (FastAPI patterns)
-  hooks/                             ← mechanical quality gates
-    subagent-stop-builder.sh
-    subagent-stop-breaker.sh
-    subagent-stop-sentinel.sh
-    pre-write-validation.md          ← validates code before writing
-  checklists/                        ← completion checklists
-    endpoint-checklist.md            ← endpoint development checklist
-  memory/                            ← persistent project knowledge (gitignored)
-    architecture.md
-    decisions.md
-    failures.md
-    wip.md
-    agent-logs/
+### On first run in a new project
+
+The conductor detects no `.claude/memory/` and automatically:
+1. Copies 14 agent templates from `~/.claude/ironclad-agents/` → `.claude/agents/`
+2. Creates memory directory with empty templates
+3. Installs verification hooks
+4. Adds `.claude/memory/` to `.gitignore`
+5. Spawns analyst for the relevant area
+6. Proceeds with your task
+
+Bootstrap is invisible — you don't wait.
+
+### On return to a project
+
+The conductor reads `.claude/memory/wip.md` and tells you:
+> "You were working on [X]. [Current state]. Want to continue or start something new?"
+
+## Agent roster
+
+| Agent | Model | Mode | Role |
+|-------|-------|------|------|
+| **conductor** | opus | user-level | Orchestrates everything, manages memory |
+| **analyst** | sonnet | background | Codebase recon, dependency tracing, memory validation |
+| **builder** | sonnet | foreground | General implementation (frontend, scripts, infra) |
+| **surgeon** | sonnet | foreground | Precision multi-file atomic edits (delegated by builder) |
+| **backend-engineer** | sonnet | foreground | FastAPI/Python specialist (replaces builder for backend) |
+| **breaker** | sonnet | background | Destruction testing — writes & runs adversarial scripts |
+| **sentinel** | haiku | background | Runs tests/types/lint — mechanical, no opinions |
+| **librarian** | haiku | background | Consolidates agent logs into shared memory |
+| **advocate** | sonnet | background | Flash tribunal — argues FOR the plan |
+| **adversary** | sonnet | background | Flash tribunal — argues AGAINST the plan |
+| **architecture-validator** | sonnet | read-only | Validates layer separation & naming |
+| **code-reviewer** | sonnet | read-only | Type hints, async patterns, security review |
+| **database-architect** | sonnet | foreground | Schema design, models, migrations |
+| **security-auditor** | sonnet | read-only | OWASP scanning, auth validation |
+| **test-generator** | sonnet | foreground | pytest-asyncio test generation |
+
+## Task complexity tiers
+
+The conductor auto-selects the right tier:
+
+| Tier | Agents spawned | When |
+|------|---------------|------|
+| **TRIVIAL** | None (do it directly) | Typo, rename, config tweak |
+| **SIMPLE** | analyst → builder → sentinel | Bug fix, add field, 3-8 files |
+| **COMPLEX** | analyst → builder(+surgeon) → breaker → sentinel | New feature, refactor, 8+ files |
+| **AMBIGUOUS** | analyst (deep) → present to user → re-assess | Unclear requirements |
+| **CRITICAL** | analyst → flash tribunal → builder → security-auditor → sentinel | Irreversible changes, auth/payments |
+
+## Project structure after bootstrap
+
+```
+your-project/
+  .claude/
+    agents/                      ← 14 project-level agents (committed to git)
       analyst.md
       builder.md
+      surgeon.md
       backend-engineer.md
       breaker.md
       sentinel.md
@@ -203,80 +137,82 @@ your-project/.claude/
       database-architect.md
       security-auditor.md
       test-generator.md
+    hooks/                       ← Mechanical quality gates (committed)
+      subagent-stop-builder.sh
+      subagent-stop-breaker.sh
+      subagent-stop-sentinel.sh
+      pre-write-validation.md
+    skills/                      ← Domain knowledge (committed)
+      backend.md
+    checklists/                  ← Completion checklists (committed)
+      endpoint-checklist.md
+    memory/                      ← Per-project learning (GITIGNORED)
+      architecture.md            ← Living codebase map
+      decisions.md               ← Decision log + tribunal records
+      failures.md                ← Failure registry + attack patterns
+      wip.md                     ← Work-in-progress for session resume
+      agent-logs/                ← Individual agent observations
+        analyst.md
+        builder.md
+        ...
 ```
+
+### What to commit vs. what to gitignore
+
+| Path | Git | Why |
+|------|-----|-----|
+| `.claude/agents/` | Commit | Shared agent definitions — team config |
+| `.claude/hooks/` | Commit | Quality gates — team standard |
+| `.claude/skills/` | Commit | Domain knowledge — shared |
+| `.claude/checklists/` | Commit | Standards — shared |
+| `.claude/memory/` | **Gitignore** | Session-specific learning — local only |
 
 ## Memory system
 
-| File | Writer | Purpose |
-|------|--------|---------|
+| File | Written by | Purpose |
+|------|-----------|---------|
 | `architecture.md` | Librarian | Living codebase map, validated by analyst |
-| `decisions.md` | Conductor | Decision log, tribunal records |
+| `decisions.md` | Conductor | Decision log, flash tribunal records |
 | `failures.md` | Librarian | Failure registry, effective attack patterns |
 | `wip.md` | Conductor | Work-in-progress state for task resumption |
 | `agent-logs/*.md` | Each agent | Individual observations and learned patterns |
 
-**Write discipline:** Only the librarian writes to shared memory (architecture.md,
-failures.md). Agents write to their own logs. The conductor writes to decisions.md
-and wip.md. This prevents conflicts.
+Write discipline prevents conflicts: only the librarian writes to shared memory. Agents write to their own logs. The conductor writes decisions and WIP directly.
 
-**Memory is gitignored.** It contains session-specific learning that's meaningful to
-the agents, not to human reviewers. The `.claude/sub-agents/` and `.claude/hooks/`
-directories CAN be committed — they're configuration, not state.
-
-## Hooks
+## Hooks (mechanical enforcement)
 
 | Hook | Enforces | Rejects when |
 |------|----------|--------------|
-| `subagent-stop-builder.sh` | Tests, types, lint pass | Any automated check fails |
+| `subagent-stop-builder.sh` | Tests + types + lint pass | Any automated check fails |
 | `subagent-stop-breaker.sh` | Scripts were executed | No evidence of test execution |
 | `subagent-stop-sentinel.sh` | Tests actually ran | No test runner output detected |
+| `pre-write-validation.md` | Code quality on write | Naming/pattern violations |
 
-Hooks are bash scripts. They run real tools. No LLM judgment. This is the ratchet —
-code can never get worse because bad output is mechanically rejected.
+No LLM judgment — real tools, real exit codes.
 
-## Backend module (Backend Fortress)
+## Flash tribunal
 
-The backend-engineer and its sub-agents bring domain-specific expertise for
-FastAPI/Python API development. The conductor automatically routes backend tasks
-to the backend-engineer instead of the generic builder.
+For critical decisions (schema migrations, auth changes, irreversible actions), the conductor auto-escalates:
 
-**What it enforces:**
-- Enhanced MVC + Service Layer: `Endpoints → Services → Repositories → Models`
-- File naming: `User.py`, `UserService.py`, `UserRepository.py`, `UserSchema.py`
-- Response format: `{"code": 200, "data": {...}, "message": "Success"}`
-- Pydantic v2 patterns, async SQLAlchemy 2.0, JWT auth
-
-**Backend sub-agents:**
-| Agent | Purpose |
-|-------|---------|
-| `architecture-validator` | Validates layer separation and naming conventions |
-| `database-architect` | Designs schemas, models, indexes, Alembic migrations |
-| `code-reviewer` | Reviews type hints, async patterns, Pydantic usage |
-| `security-auditor` | OWASP Top 10 scanning, auth validation |
-| `test-generator` | Generates pytest-asyncio tests with proper fixtures |
-
-**Backend skill:** `skills/backend.md` — 2400+ lines of production patterns, code
-templates, and anti-hallucination rules for FastAPI development.
-
-## Opus 4.6 features used
-
-- **Model mixing**: opus (conductor) / sonnet (workers) / haiku (verification)
-- **Project memory**: agents learn per-project patterns across sessions
-- **User memory**: conductor knows your preferences across all projects
-- **Background execution**: analyst, breaker, sentinel, librarian run in background
-- **Agent-to-agent delegation**: builder spawns surgeon for multi-file edits
-- **SubagentStop hooks**: mechanical quality enforcement on builder, breaker, sentinel
+1. Writes proposed plan to `wip.md`
+2. Spawns **advocate** (background) — builds case FOR with codebase evidence
+3. Spawns **adversary** (background) — finds genuine risks with codebase evidence
+4. Reads both reports
+5. Makes final decision
+6. Logs full reasoning to `decisions.md`
 
 ## Customization
 
-**Add project-specific agents:** Create new `.md` files in `.claude/sub-agents/`.
-The conductor will discover and use them if relevant.
+**Add agents:** Create `.md` files in `.claude/agents/`. Follow the frontmatter format (name, description, tools, model).
 
-**Modify complexity thresholds:** Edit the conductor's Task Assessment section
-to change when different tiers trigger.
+**Change model allocation:** Edit `model:` in any agent's frontmatter. Use `haiku` for cheap tasks, `opus` for critical ones, `inherit` to match the session.
 
-**Add more hooks:** Create new `subagent-stop-[name].sh` files in `.claude/hooks/`.
-They'll automatically run when that agent completes.
+**Add hooks:** Create `subagent-stop-[name].sh` in `.claude/hooks/`. Auto-runs when that agent completes.
 
-**Tune model allocation:** Change the `model:` field in any agent's frontmatter.
-Use `model: inherit` to match whatever the main session uses.
+**Modify complexity tiers:** Edit the conductor's Task Assessment section.
+
+## Requirements
+
+- Claude Code with Opus 4.6 (for agent teams + background execution)
+- Python 3 (for settings.json merge during install — optional)
+- Git Bash on Windows (install script is bash)

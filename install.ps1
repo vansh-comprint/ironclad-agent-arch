@@ -1,197 +1,242 @@
 # ============================================================================
-# CONDUCTOR AGENT SYSTEM — INSTALLER (PowerShell)
-# ============================================================================
-# For Windows users without Git Bash. Same behavior as install.sh.
+# Conductor — Multi-Agent Orchestration for Claude Code
+# Install Script (Windows PowerShell)
 #
 # Usage:
-#   .\install.ps1              # Install conductor only (user-level)
-#   .\install.ps1 -Project     # Install conductor + bootstrap current project
+#   .\install.ps1              Install conductor + enable agent teams
+#   .\install.ps1 -Project     Install + bootstrap current project
+#   .\install.ps1 -Uninstall   Remove conductor
 # ============================================================================
 
 param(
-    [switch]$Project
+    [switch]$Project,
+    [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$UserAgentsDir = Join-Path $env:USERPROFILE ".claude\sub-agents"
-$ProjectDir = Get-Location
+$ClaudeHome = Join-Path $env:USERPROFILE ".claude"
+$AgentsDir = Join-Path $ClaudeHome "agents"
+$TemplateSrc = Join-Path $ScriptDir "project-level\.claude"
+$TemplateDest = Join-Path $ClaudeHome "ironclad-agents\project-level\.claude"
+$SettingsFile = Join-Path $ClaudeHome "settings.json"
 
-Write-Host "============================================"
-Write-Host "  CONDUCTOR AGENT SYSTEM - INSTALLER"
-Write-Host "============================================"
+Write-Host ""
+Write-Host "Conductor - Multi-Agent Orchestration for Claude Code" -ForegroundColor White
+Write-Host "Background & parallel sub-agents with project-scoped memory"
+Write-Host "======================================================"
 Write-Host ""
 
-# --- Step 1: Install conductor (user-level) ---
-Write-Host "[1/3] Installing conductor to ~/.claude/sub-agents/ ..."
-
-if (-not (Test-Path $UserAgentsDir)) {
-    New-Item -ItemType Directory -Path $UserAgentsDir -Force | Out-Null
+# --- Uninstall ---
+if ($Uninstall) {
+    $conductor = Join-Path $AgentsDir "conductor.md"
+    if (Test-Path $conductor) {
+        Remove-Item $conductor -Force
+        Write-Host " + Removed conductor" -ForegroundColor Green
+    } else {
+        Write-Host " ! Conductor not found" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Host " ! Template store not removed. To fully remove:" -ForegroundColor Yellow
+    Write-Host "   Remove-Item -Recurse $ClaudeHome\ironclad-agents"
+    exit 0
 }
 
-$ConductorDest = Join-Path $UserAgentsDir "conductor.md"
+# --- Step 1: Install conductor ---
+Write-Host ">>> Installing conductor agent (user-level)..." -ForegroundColor Cyan
+
+if (-not (Test-Path $AgentsDir)) {
+    New-Item -ItemType Directory -Path $AgentsDir -Force | Out-Null
+}
+
+$ConductorDest = Join-Path $AgentsDir "conductor.md"
 if (Test-Path $ConductorDest) {
-    Write-Host "  WARNING: conductor.md already exists. Backing up to conductor.md.backup"
     Copy-Item $ConductorDest "$ConductorDest.backup" -Force
+    Write-Host " ! Backed up existing conductor.md" -ForegroundColor Yellow
 }
 
 $ConductorSrc = Join-Path $ScriptDir "user-level\.claude\sub-agents\conductor.md"
-Copy-Item $ConductorSrc $ConductorDest -Force
-Write-Host "  OK: Conductor installed"
-Write-Host ""
+if (-not (Test-Path $ConductorSrc)) {
+    $ConductorSrc = Join-Path $ScriptDir "conductor.md"
+}
+if (Test-Path $ConductorSrc) {
+    Copy-Item $ConductorSrc $ConductorDest -Force
+    Write-Host " + Conductor installed at ~/.claude/agents/conductor.md" -ForegroundColor Green
+} else {
+    Write-Host " x conductor.md not found in repo" -ForegroundColor Red
+    exit 1
+}
 
-# --- Step 2: Optionally bootstrap project ---
+# --- Step 2: Install templates ---
+Write-Host ">>> Installing project templates..." -ForegroundColor Cyan
+
+# Skip if running from inside the target
+$srcNorm = (Resolve-Path $ScriptDir -ErrorAction SilentlyContinue).Path
+$destNorm = (Resolve-Path (Join-Path $ClaudeHome "ironclad-agents") -ErrorAction SilentlyContinue).Path
+
+if ($srcNorm -eq $destNorm) {
+    Write-Host " + Templates already in place" -ForegroundColor Green
+} else {
+    $templateDirs = @(
+        "sub-agents", "memory\agent-logs", "hooks", "skills", "checklists"
+    )
+    foreach ($dir in $templateDirs) {
+        $full = Join-Path $TemplateDest $dir
+        if (-not (Test-Path $full)) {
+            New-Item -ItemType Directory -Path $full -Force | Out-Null
+        }
+    }
+
+    # Copy all template files
+    if (Test-Path "$TemplateSrc\sub-agents") {
+        Copy-Item "$TemplateSrc\sub-agents\*.md" (Join-Path $TemplateDest "sub-agents") -Force
+    }
+    foreach ($f in @("architecture.md", "decisions.md", "failures.md", "wip.md")) {
+        $s = Join-Path "$TemplateSrc\memory" $f
+        if (Test-Path $s) { Copy-Item $s (Join-Path "$TemplateDest\memory" $f) -Force }
+    }
+    if (Test-Path "$TemplateSrc\memory\agent-logs") {
+        Copy-Item "$TemplateSrc\memory\agent-logs\*.md" (Join-Path $TemplateDest "memory\agent-logs") -Force
+    }
+    if (Test-Path "$TemplateSrc\hooks") {
+        Copy-Item "$TemplateSrc\hooks\*" (Join-Path $TemplateDest "hooks") -Force
+    }
+    if (Test-Path "$TemplateSrc\skills") {
+        Copy-Item "$TemplateSrc\skills\*.md" (Join-Path $TemplateDest "skills") -Force
+    }
+    if (Test-Path "$TemplateSrc\checklists") {
+        Copy-Item "$TemplateSrc\checklists\*.md" (Join-Path $TemplateDest "checklists") -Force
+    }
+
+    $agentCount = (Get-ChildItem "$TemplateDest\sub-agents\*.md" -ErrorAction SilentlyContinue).Count
+    Write-Host " + Installed $agentCount agent templates + memory + hooks + skills" -ForegroundColor Green
+}
+
+# --- Step 3: Update settings.json ---
+Write-Host ">>> Configuring Claude Code settings..." -ForegroundColor Cyan
+
+if (-not (Test-Path $SettingsFile)) {
+    @{
+        alwaysThinkingEnabled = $true
+        env = @{
+            CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"
+        }
+    } | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile
+    Write-Host " + Created settings.json" -ForegroundColor Green
+} else {
+    try {
+        $settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json
+        $changed = $false
+
+        if (-not $settings.alwaysThinkingEnabled) {
+            $settings | Add-Member -NotePropertyName "alwaysThinkingEnabled" -NotePropertyValue $true -Force
+            $changed = $true
+        }
+
+        if (-not $settings.env) {
+            $settings | Add-Member -NotePropertyName "env" -NotePropertyValue @{} -Force
+        }
+
+        if ($settings.env -is [PSCustomObject]) {
+            if ($settings.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS -ne "1") {
+                $settings.env | Add-Member -NotePropertyName "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" -NotePropertyValue "1" -Force
+                $changed = $true
+            }
+        }
+
+        if ($changed) {
+            $settings | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile
+            Write-Host " + Agent teams + extended thinking enabled" -ForegroundColor Green
+        } else {
+            Write-Host " + Settings already configured" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host " ! Could not update settings.json. Add manually:" -ForegroundColor Yellow
+        Write-Host '   "alwaysThinkingEnabled": true,'
+        Write-Host '   "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" }'
+    }
+}
+
+# --- Step 4 (optional): Bootstrap project ---
 if ($Project) {
-    Write-Host "[2/3] Bootstrapping project at $ProjectDir ..."
+    Write-Host ""
+    Write-Host ">>> Bootstrapping project at $(Get-Location)..." -ForegroundColor Cyan
+
+    $src = $TemplateDest
+    if (-not (Test-Path "$src\sub-agents")) { $src = $TemplateSrc }
 
     # Create directories
-    $dirs = @(
-        ".claude\sub-agents",
-        ".claude\hooks",
-        ".claude\skills",
-        ".claude\checklists",
-        ".claude\memory\agent-logs"
-    )
-    foreach ($dir in $dirs) {
-        $fullPath = Join-Path $ProjectDir $dir
-        if (-not (Test-Path $fullPath)) {
-            New-Item -ItemType Directory -Path $fullPath -Force | Out-Null
-        }
+    foreach ($dir in @(".claude\agents", ".claude\memory\agent-logs", ".claude\hooks", ".claude\skills", ".claude\checklists")) {
+        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     }
 
-    # Copy agent files (don't overwrite existing)
-    $agentSrc = Join-Path $ScriptDir "project-level\.claude\sub-agents"
-    Get-ChildItem "$agentSrc\*.md" | ForEach-Object {
-        $dest = Join-Path $ProjectDir ".claude\sub-agents\$($_.Name)"
-        if (Test-Path $dest) {
-            Write-Host "  WARNING: $($_.Name) already exists - skipping"
-        } else {
-            Copy-Item $_.FullName $dest
-            Write-Host "  OK: Installed $($_.Name)"
-        }
-    }
-
-    # Copy hooks — all types (don't overwrite existing)
-    $hookSrc = Join-Path $ScriptDir "project-level\.claude\hooks"
-    Get-ChildItem "$hookSrc\*" -File | ForEach-Object {
-        $dest = Join-Path $ProjectDir ".claude\hooks\$($_.Name)"
-        if (Test-Path $dest) {
-            Write-Host "  WARNING: $($_.Name) already exists - skipping"
-        } else {
-            Copy-Item $_.FullName $dest
-            Write-Host "  OK: Installed $($_.Name)"
-        }
-    }
-
-    # Copy skills (don't overwrite existing)
-    $skillSrc = Join-Path $ScriptDir "project-level\.claude\skills"
-    if (Test-Path $skillSrc) {
-        Get-ChildItem "$skillSrc\*.md" | ForEach-Object {
-            $dest = Join-Path $ProjectDir ".claude\skills\$($_.Name)"
-            if (Test-Path $dest) {
-                Write-Host "  WARNING: skills/$($_.Name) already exists - skipping"
-            } else {
-                Copy-Item $_.FullName $dest
-                Write-Host "  OK: Installed skills/$($_.Name)"
-            }
-        }
-    }
-
-    # Copy checklists (don't overwrite existing)
-    $checklistSrc = Join-Path $ScriptDir "project-level\.claude\checklists"
-    if (Test-Path $checklistSrc) {
-        Get-ChildItem "$checklistSrc\*.md" | ForEach-Object {
-            $dest = Join-Path $ProjectDir ".claude\checklists\$($_.Name)"
-            if (Test-Path $dest) {
-                Write-Host "  WARNING: checklists/$($_.Name) already exists - skipping"
-            } else {
-                Copy-Item $_.FullName $dest
-                Write-Host "  OK: Installed checklists/$($_.Name)"
-            }
-        }
-    }
-
-    # Copy memory templates (don't overwrite existing)
-    $memSrc = Join-Path $ScriptDir "project-level\.claude\memory"
-    Get-ChildItem "$memSrc\*.md" | ForEach-Object {
-        $dest = Join-Path $ProjectDir ".claude\memory\$($_.Name)"
-        if (Test-Path $dest) {
-            Write-Host "  WARNING: $($_.Name) already exists - skipping"
-        } else {
-            Copy-Item $_.FullName $dest
-            Write-Host "  OK: Created $($_.Name)"
-        }
-    }
-
-    # Copy agent log templates
-    $logSrc = Join-Path $ScriptDir "project-level\.claude\memory\agent-logs"
-    Get-ChildItem "$logSrc\*.md" | ForEach-Object {
-        $dest = Join-Path $ProjectDir ".claude\memory\agent-logs\$($_.Name)"
+    # Agents (sub-agents/ → agents/ rename)
+    $count = 0
+    Get-ChildItem "$src\sub-agents\*.md" | ForEach-Object {
+        $dest = Join-Path ".claude\agents" $_.Name
         if (-not (Test-Path $dest)) {
             Copy-Item $_.FullName $dest
+            $count++
         }
     }
-    Write-Host "  OK: Agent logs initialized"
+    Write-Host " + $count agents installed to .claude/agents/" -ForegroundColor Green
 
-    # Add to .gitignore
-    $gitignore = Join-Path $ProjectDir ".gitignore"
-    if (Test-Path $gitignore) {
-        $content = Get-Content $gitignore -Raw
+    # Memory templates
+    foreach ($f in @("architecture.md", "decisions.md", "failures.md", "wip.md")) {
+        $s = Join-Path "$src\memory" $f
+        $d = Join-Path ".claude\memory" $f
+        if ((Test-Path $s) -and -not (Test-Path $d)) { Copy-Item $s $d }
+    }
+    Get-ChildItem "$src\memory\agent-logs\*.md" -ErrorAction SilentlyContinue | ForEach-Object {
+        $d = Join-Path ".claude\memory\agent-logs" $_.Name
+        if (-not (Test-Path $d)) { Copy-Item $_.FullName $d }
+    }
+    Write-Host " + Memory templates created" -ForegroundColor Green
+
+    # Hooks
+    Get-ChildItem "$src\hooks\*" -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $d = Join-Path ".claude\hooks" $_.Name
+        if (-not (Test-Path $d)) { Copy-Item $_.FullName $d }
+    }
+    Write-Host " + Hooks installed" -ForegroundColor Green
+
+    # Skills + checklists
+    Get-ChildItem "$src\skills\*.md" -ErrorAction SilentlyContinue | ForEach-Object {
+        $d = Join-Path ".claude\skills" $_.Name
+        if (-not (Test-Path $d)) { Copy-Item $_.FullName $d }
+    }
+    Get-ChildItem "$src\checklists\*.md" -ErrorAction SilentlyContinue | ForEach-Object {
+        $d = Join-Path ".claude\checklists" $_.Name
+        if (-not (Test-Path $d)) { Copy-Item $_.FullName $d }
+    }
+    Write-Host " + Skills + checklists installed" -ForegroundColor Green
+
+    # .gitignore
+    if (Test-Path ".gitignore") {
+        $content = Get-Content ".gitignore" -Raw
         if ($content -notmatch "\.claude/memory/") {
-            Add-Content $gitignore "`n# Agent system memory (session-specific, not for git)`n.claude/memory/"
-            Write-Host "  OK: Added .claude/memory/ to .gitignore"
-        } else {
-            Write-Host "  INFO: .gitignore already excludes .claude/memory/"
+            Add-Content ".gitignore" "`n# Agent memory (local, not shared)`n.claude/memory/"
+            Write-Host " + Added .claude/memory/ to .gitignore" -ForegroundColor Green
         }
-    } else {
-        Set-Content $gitignore "# Agent system memory (session-specific, not for git)`n.claude/memory/"
-        Write-Host "  OK: Created .gitignore with .claude/memory/ exclusion"
     }
 
-    # Handle CLAUDE.md
-    $claudeMd = Join-Path $ProjectDir "CLAUDE.md"
-    $agentDocSrc = Join-Path $ScriptDir "project-level\CLAUDE-AGENT-SYSTEM.md"
-    if (Test-Path $claudeMd) {
-        $content = Get-Content $claudeMd -Raw
-        if ($content -notmatch "Agent System") {
-            Add-Content $claudeMd "`n$(Get-Content $agentDocSrc -Raw)"
-            Write-Host "  OK: Appended agent system docs to CLAUDE.md"
-        } else {
-            Write-Host "  INFO: CLAUDE.md already has agent system reference"
-        }
-    } else {
-        Copy-Item $agentDocSrc $claudeMd
-        Write-Host "  OK: Created CLAUDE.md with agent system docs"
-    }
-
-    Write-Host ""
-    Write-Host "  Project bootstrapped successfully!"
-} else {
-    Write-Host "[2/3] Skipping project bootstrap (use -Project to bootstrap current directory)"
+    Write-Host " + Project ready" -ForegroundColor Green
 }
 
+# --- Done ---
 Write-Host ""
-Write-Host "[3/3] Done!"
+Write-Host "Done!" -ForegroundColor Green
 Write-Host ""
-Write-Host "============================================"
-Write-Host "  INSTALLATION COMPLETE"
-Write-Host "============================================"
+Write-Host "  Conductor:  ~/.claude/agents/conductor.md"
+Write-Host "  Templates:  ~/.claude/ironclad-agents/"
+Write-Host "  Settings:   Agent teams + extended thinking enabled"
 Write-Host ""
-Write-Host "  Conductor installed at: $ConductorDest"
-if ($Project) {
-    Write-Host "  Project agents at:      $ProjectDir\.claude\sub-agents\"
-    Write-Host "  Memory at:              $ProjectDir\.claude\memory\"
-    Write-Host "  Hooks at:               $ProjectDir\.claude\hooks\"
-}
+Write-Host "  In Claude Code, say:"
+Write-Host '    "Use the conductor to [your task]"'
 Write-Host ""
-Write-Host "  To use: just say 'use the conductor to [task]' in Claude Code"
+Write-Host "  The conductor auto-bootstraps any new project on first run."
+Write-Host "  Or manually: .\install.ps1 -Project (from project directory)"
 Write-Host ""
-Write-Host "  The conductor will automatically:"
-Write-Host "    - Bootstrap new projects on first run"
-Write-Host "    - Resume work-in-progress from memory"
-Write-Host "    - Delegate to specialized agents"
-Write-Host "    - Enforce quality through hooks"
-Write-Host "    - Learn from this project over time"
+Write-Host "  Restart Claude Code to pick up changes." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "============================================"
