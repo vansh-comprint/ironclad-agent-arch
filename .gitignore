@@ -1,0 +1,15 @@
+# OS artifacts
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# Editor/IDE
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Windows
+nul
