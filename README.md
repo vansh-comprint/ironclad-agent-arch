@@ -1,19 +1,34 @@
 # Conductor — Multi-Agent Orchestration for Claude Code
 
-One agent to manage everything. Background & parallel sub-agents with project-scoped memory.
+One agent to manage everything. Agent Teams with peer-to-peer messaging, self-improving memory, and parallel execution.
 
 ## What this is
 
-A multi sub-agent orchestration system for Claude Code (Opus 4.6+). One user-level **conductor** agent automatically bootstraps any project with 14 specialized workers that run in **background and parallel**, maintain **persistent per-project memory**, and enforce quality through **mechanical hooks**.
+A multi-agent orchestration system for Claude Code (Opus 4.6+) using **Agent Teams**. One user-level **conductor** agent automatically bootstraps any project with 14 specialized teammates that run in **persistent parallel sessions**, communicate **peer-to-peer**, maintain **self-improving per-project memory**, and enforce quality through **mechanical hooks**.
 
 You never call individual agents. You call the conductor. It reads the room.
 
+**Key features:**
+- **Agent Teams** — teammates get their own context windows and message each other directly
+- **Self-improving** — every task makes the team smarter (attack patterns, scan strategies, conventions)
+- **Smart communication** — structured messages with priority, type, and action routing
+- **Hybrid orchestration** — Agent Teams for complex work, lightweight subagents for simple work
+- **Meta-learning** — librarian tracks team effectiveness and recommends improvements to conductor
+
 ## Install (one command)
 
+### Linux / macOS / Git Bash on Windows
 ```bash
 git clone https://github.com/vansh-comprint/ironclad-agent-arch.git conductor-agents
 cd conductor-agents
 ./install.sh
+```
+
+### Windows PowerShell
+```powershell
+git clone https://github.com/vansh-comprint/ironclad-agent-arch.git conductor-agents
+cd conductor-agents
+.\install.ps1
 ```
 
 That's it. Restart Claude Code.
@@ -21,8 +36,30 @@ That's it. Restart Claude Code.
 ### What the installer does
 
 1. Copies `conductor.md` to `~/.claude/agents/` (user-level — follows you everywhere)
-2. Copies project templates to `~/.claude/ironclad-agents/` (template store)
-3. Enables **agent teams** + **extended thinking** in `~/.claude/settings.json`
+2. Copies 14 agent templates to `~/.claude/ironclad-agents/` (template store)
+3. **Enables Agent Teams** in `~/.claude/settings.json`:
+   - Sets `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (enables teammate sessions)
+   - Sets `alwaysThinkingEnabled=true` (extended thinking for better orchestration)
+
+### Manual Agent Teams setup (if not using installer)
+
+If you already have the agents and just need to enable Agent Teams:
+
+```bash
+# Option 1: Edit ~/.claude/settings.json manually
+# Add this to your settings.json:
+{
+  "alwaysThinkingEnabled": true,
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
+```
+
+```bash
+# Option 2: The conductor auto-enables it on first bootstrap
+# Just invoke the conductor — it checks and enables Agent Teams automatically
+```
 
 ### Optional: bootstrap a project manually
 
@@ -60,12 +97,52 @@ The conductor handles everything from there.
 ```
 YOU → conductor (opus, user-level)
       │
-      ├─ Checks .claude/memory/ → knows project state
-      ├─ Assesses task complexity → picks the right tier
+      ├─ Checks .claude/memory/ → knows project state + meta-learnings
+      ├─ Assesses task complexity → picks orchestration mode
       ├─ Routes by domain → specialist or general builder
-      ├─ Spawns agents in background/parallel where possible
-      ├─ Hooks reject bad output mechanically
-      └─ Updates memory → project gets smarter over time
+      │
+      ├─ SIMPLE tasks: Task tool subagents (cheap, sequential)
+      │   └─ analyst → builder → sentinel
+      │
+      ├─ COMPLEX tasks: Agent Team (parallel, peer-to-peer)
+      │   └─ spawnTeam → teammates communicate directly
+      │       analyst ──HANDOFF──▶ builder ──HANDOFF──▶ breaker + sentinel
+      │                                                       │
+      │       breaker ──BUG──▶ builder (fix cycle)            │
+      │       sentinel ──PASS──▶ ALL (broadcast)              │
+      │       librarian ──META──▶ conductor (team learnings)  │
+      │
+      ├─ CRITICAL tasks: Agent Team + Flash Tribunal
+      │   └─ advocate + adversary → decision → team execution
+      │
+      └─ Updates memory → project gets smarter every task
+```
+
+### Self-improvement loop
+
+Every task makes the team smarter:
+
+```
+Task N:
+  analyst scans → builder implements → breaker tests → sentinel verifies
+                                          │
+                                          ▼
+  librarian consolidates ALL agent logs + messages:
+    - Which scan strategies found useful info? (promote/demote)
+    - Which attack patterns found real bugs? (promote/demote)
+    - How many fix cycles? (track trend)
+    - What communication patterns worked? (record)
+                                          │
+                                          ▼
+  librarian sends META-LEARNING report to conductor:
+    "Team effectiveness: 4/5. Builder's null handling improved.
+     Breaker's auth bypass pattern found 2 bugs — promote it.
+     Recommend: always include security-auditor for auth tasks."
+                                          │
+                                          ▼
+Task N+1:
+  conductor reads meta-learnings → adapts team composition + routing
+  each agent reads its own log → adapts strategy based on past effectiveness
 ```
 
 ### On first run in a new project
@@ -74,8 +151,8 @@ The conductor detects no `.claude/memory/` and automatically:
 1. Copies 14 agent templates from `~/.claude/ironclad-agents/` → `.claude/agents/`
 2. Creates memory directory with empty templates
 3. Installs verification hooks
-4. Adds `.claude/memory/` to `.gitignore`
-5. Spawns analyst for the relevant area
+4. Enables Agent Teams if not already enabled
+5. Adds `.claude/memory/` to `.gitignore`
 6. Proceeds with your task
 
 Bootstrap is invisible — you don't wait.
@@ -85,37 +162,77 @@ Bootstrap is invisible — you don't wait.
 The conductor reads `.claude/memory/wip.md` and tells you:
 > "You were working on [X]. [Current state]. Want to continue or start something new?"
 
+It also reads the librarian's meta-learning report to improve orchestration.
+
 ## Agent roster
 
-| Agent | Model | Mode | Role |
-|-------|-------|------|------|
-| **conductor** | opus | user-level | Orchestrates everything, manages memory |
-| **analyst** | sonnet | background | Codebase recon, dependency tracing, memory validation |
-| **builder** | sonnet | foreground | General implementation (frontend, scripts, infra) |
-| **surgeon** | sonnet | foreground | Precision multi-file atomic edits (delegated by builder) |
-| **backend-engineer** | sonnet | foreground | FastAPI/Python specialist (replaces builder for backend) |
-| **breaker** | sonnet | background | Destruction testing — writes & runs adversarial scripts |
-| **sentinel** | haiku | background | Runs tests/types/lint — mechanical, no opinions |
-| **librarian** | haiku | background | Consolidates agent logs into shared memory |
-| **advocate** | sonnet | background | Flash tribunal — argues FOR the plan |
-| **adversary** | sonnet | background | Flash tribunal — argues AGAINST the plan |
-| **architecture-validator** | sonnet | read-only | Validates layer separation & naming |
-| **code-reviewer** | sonnet | read-only | Type hints, async patterns, security review |
-| **database-architect** | sonnet | foreground | Schema design, models, migrations |
-| **security-auditor** | sonnet | read-only | OWASP scanning, auth validation |
-| **test-generator** | sonnet | foreground | pytest-asyncio test generation |
+### Teammates (persistent sessions, peer-to-peer messaging)
+
+| Agent | Color | Model | Role |
+|-------|-------|-------|------|
+| **conductor** | orange | opus | Orchestrates teams, manages memory, approves plans |
+| **analyst** | cyan | sonnet | Codebase recon, sends HANDOFF to builder with findings |
+| **builder** | yellow | sonnet | General implementation, receives from analyst, hands off to breaker+sentinel |
+| **backend-engineer** | blue | sonnet | FastAPI specialist, replaces builder for backend tasks |
+| **breaker** | red | sonnet | Destruction testing, sends BUG reports directly to builder |
+| **sentinel** | green | haiku | Runs tests/types/lint, broadcasts PASS/FAIL to all |
+| **librarian** | purple | haiku | Memory consolidation + meta-learning, makes team smarter |
+
+### Task subagents (lightweight, spawned by teammates)
+
+| Agent | Color | Model | Spawned by | Role |
+|-------|-------|-------|-----------|------|
+| **surgeon** | yellow | sonnet | builder | Precision multi-file atomic edits |
+| **advocate** | magenta | sonnet | conductor | Flash tribunal — argues FOR |
+| **adversary** | magenta | sonnet | conductor | Flash tribunal — argues AGAINST |
+| **architecture-validator** | cyan | sonnet | backend-engineer | Validates layer separation |
+| **code-reviewer** | cyan | sonnet | backend-engineer | Type hints, async, security |
+| **database-architect** | blue | sonnet | backend-engineer | Schema design, migrations |
+| **security-auditor** | red | sonnet | backend-engineer | OWASP scanning |
+| **test-generator** | green | sonnet | backend-engineer | pytest-asyncio generation |
 
 ## Task complexity tiers
 
-The conductor auto-selects the right tier:
+The conductor auto-selects the right orchestration mode:
 
-| Tier | Agents spawned | When |
-|------|---------------|------|
-| **TRIVIAL** | None (do it directly) | Typo, rename, config tweak |
-| **SIMPLE** | analyst → builder → sentinel | Bug fix, add field, 3-8 files |
-| **COMPLEX** | analyst → builder(+surgeon) → breaker → sentinel | New feature, refactor, 8+ files |
-| **AMBIGUOUS** | analyst (deep) → present to user → re-assess | Unclear requirements |
-| **CRITICAL** | analyst → flash tribunal → builder → security-auditor → sentinel | Irreversible changes, auth/payments |
+| Tier | Mode | Agents | When |
+|------|------|--------|------|
+| **TRIVIAL** | Direct | None | Typo, rename, config tweak |
+| **SIMPLE** | Task subagents | analyst → builder → sentinel | Bug fix, add field, 3-8 files |
+| **COMPLEX** | Agent Team | analyst + builder + breaker + sentinel + librarian | New feature, refactor, 8+ files |
+| **AMBIGUOUS** | Explore first | analyst (deep scan) → present to user | Unclear requirements |
+| **CRITICAL** | Agent Team + tribunal | Full team + advocate + adversary | Irreversible, auth/payments |
+
+**Cost awareness:** Agent Teams use ~5x tokens (each teammate = full session). The conductor uses them only when parallel work genuinely adds value.
+
+## Communication protocol
+
+All teammates use structured messages:
+
+```
+[PRIORITY: LOW|MEDIUM|HIGH|CRITICAL]
+[TYPE: REPORT|HANDOFF|BUG|PLAN|PASS|FAIL|META|...]
+[TO: teammate_name or ALL]
+
+[Structured content — compressed, actionable]
+
+[ACTION NEEDED: what the recipient should do]
+```
+
+### Message flow (COMPLEX task)
+
+```
+conductor ──mission──▶ analyst
+analyst ──HANDOFF──▶ builder (with LANDMINE tags)
+analyst ──REPORT──▶ breaker (fragile areas to attack)
+builder ──PLAN──▶ conductor (for approval)
+conductor ──approvePlan──▶ builder
+builder ──HANDOFF──▶ sentinel + breaker
+breaker ──BUG──▶ builder (individual bugs as found)
+builder ──BUG_FIX──▶ sentinel (re-verify)
+sentinel ──PASS──▶ ALL (broadcast)
+librarian ──META──▶ conductor (team learnings)
+```
 
 ## Project structure after bootstrap
 
@@ -123,38 +240,15 @@ The conductor auto-selects the right tier:
 your-project/
   .claude/
     agents/                      ← 14 project-level agents (committed to git)
-      analyst.md
-      builder.md
-      surgeon.md
-      backend-engineer.md
-      breaker.md
-      sentinel.md
-      librarian.md
-      advocate.md
-      adversary.md
-      architecture-validator.md
-      code-reviewer.md
-      database-architect.md
-      security-auditor.md
-      test-generator.md
     hooks/                       ← Mechanical quality gates (committed)
-      subagent-stop-builder.sh
-      subagent-stop-breaker.sh
-      subagent-stop-sentinel.sh
-      pre-write-validation.md
     skills/                      ← Domain knowledge (committed)
-      backend.md
     checklists/                  ← Completion checklists (committed)
-      endpoint-checklist.md
     memory/                      ← Per-project learning (GITIGNORED)
       architecture.md            ← Living codebase map
       decisions.md               ← Decision log + tribunal records
-      failures.md                ← Failure registry + attack patterns
+      failures.md                ← Failure registry + attack pattern scores
       wip.md                     ← Work-in-progress for session resume
-      agent-logs/                ← Individual agent observations
-        analyst.md
-        builder.md
-        ...
+      agent-logs/                ← Individual agent observations + learnings
 ```
 
 ### What to commit vs. what to gitignore
@@ -173,11 +267,11 @@ your-project/
 |------|-----------|---------|
 | `architecture.md` | Librarian | Living codebase map, validated by analyst |
 | `decisions.md` | Conductor | Decision log, flash tribunal records |
-| `failures.md` | Librarian | Failure registry, effective attack patterns |
+| `failures.md` | Librarian | Failure registry, attack pattern effectiveness scores |
 | `wip.md` | Conductor | Work-in-progress state for task resumption |
-| `agent-logs/*.md` | Each agent | Individual observations and learned patterns |
+| `agent-logs/*.md` | Each agent | Individual observations, effectiveness tracking, learnings |
 
-Write discipline prevents conflicts: only the librarian writes to shared memory. Agents write to their own logs. The conductor writes decisions and WIP directly.
+Write discipline prevents conflicts. The librarian is the meta-learner — it tracks team effectiveness across tasks and sends recommendations to the conductor.
 
 ## Hooks (mechanical enforcement)
 
@@ -203,16 +297,19 @@ For critical decisions (schema migrations, auth changes, irreversible actions), 
 
 ## Customization
 
-**Add agents:** Create `.md` files in `.claude/agents/`. Follow the frontmatter format (name, description, tools, model).
+**Add agents:** Create `.md` files in `.claude/agents/`. Follow the frontmatter format (name, description, tools, model, color).
 
-**Change model allocation:** Edit `model:` in any agent's frontmatter. Use `haiku` for cheap tasks, `opus` for critical ones, `inherit` to match the session.
+**Change model allocation:** Edit `model:` in any agent's frontmatter. Use `haiku` for cheap tasks, `opus` for critical ones.
 
 **Add hooks:** Create `subagent-stop-[name].sh` in `.claude/hooks/`. Auto-runs when that agent completes.
 
 **Modify complexity tiers:** Edit the conductor's Task Assessment section.
 
+**Tune self-improvement:** Each agent's Self-Improvement Protocol section controls what it learns. Edit to add project-specific patterns.
+
 ## Requirements
 
-- Claude Code with Opus 4.6 (for agent teams + background execution)
+- Claude Code with Opus 4.6+ (for Agent Teams + background execution)
+- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings (installer handles this)
 - Python 3 (for settings.json merge during install — optional)
-- Git Bash on Windows (install script is bash)
+- Git Bash on Windows (install script is bash) or PowerShell (install.ps1)
