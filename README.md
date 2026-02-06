@@ -21,18 +21,24 @@ YOU → "conductor, [task]"
       │
       ├── Reads project memory → knows where things stand
       ├── Assesses complexity → picks the right agents
-      ├── Delegates & coordinates → manages the whole flow
+      ├── Routes by domain → specialist or general builder
       ├── Enforces quality → hooks reject bad output mechanically
       └── Updates memory → project gets smarter over time
           │
-          ├── ANALYST (sonnet, bg)    — maps code, validates memory
-          ├── BUILDER (sonnet)        — implements, delegates to surgeon
-          │     └── SURGEON (sonnet)  — precision multi-file edits
-          ├── BREAKER (sonnet, bg)    — destruction testing
-          ├── SENTINEL (haiku, bg)    — runs tests/types/lint
-          ├── LIBRARIAN (haiku, bg)   — consolidates memory
-          ├── ADVOCATE (sonnet, bg)   — tribunal: case FOR
-          └── ADVERSARY (sonnet, bg)  — tribunal: case AGAINST
+          ├── ANALYST (sonnet, bg)           — maps code, validates memory
+          ├── BUILDER (sonnet)               — general implementation
+          │     └── SURGEON (sonnet)         — precision multi-file edits
+          ├── BACKEND-ENGINEER (sonnet)      — FastAPI/Python API specialist
+          │     ├── architecture-validator   — layer separation checks
+          │     ├── database-architect       — schema & migration design
+          │     ├── code-reviewer            — quality & pattern review
+          │     ├── security-auditor         — OWASP & auth scanning
+          │     └── test-generator           — pytest-asyncio tests
+          ├── BREAKER (sonnet, bg)           — destruction testing
+          ├── SENTINEL (haiku, bg)           — runs tests/types/lint
+          ├── LIBRARIAN (haiku, bg)          — consolidates memory
+          ├── ADVOCATE (sonnet, bg)          — tribunal: case FOR
+          └── ADVERSARY (sonnet, bg)         — tribunal: case AGAINST
 ```
 
 ## Key design decisions
@@ -151,23 +157,34 @@ The conductor handles everything from there.
 
 ```
 ~/.claude/sub-agents/
-  conductor.md                    ← user-level, follows you everywhere
+  conductor.md                       ← user-level, follows you everywhere
 
 your-project/.claude/
-  sub-agents/                     ← project-level workers
-    analyst.md
-    builder.md
-    surgeon.md
-    breaker.md
-    sentinel.md
-    librarian.md
-    advocate.md
-    adversary.md
-  hooks/                          ← mechanical quality gates
+  sub-agents/                        ← project-level workers
+    analyst.md                       ← reconnaissance & memory validation
+    builder.md                       ← general implementation
+    surgeon.md                       ← precision multi-file edits
+    backend-engineer.md              ← FastAPI/Python API specialist
+    architecture-validator.md        ← backend: layer separation checks
+    code-reviewer.md                 ← backend: quality & pattern review
+    database-architect.md            ← backend: schema & migration design
+    security-auditor.md              ← backend: OWASP & auth scanning
+    test-generator.md                ← backend: pytest-asyncio tests
+    breaker.md                       ← destruction testing
+    sentinel.md                      ← mechanical verification
+    librarian.md                     ← memory management
+    advocate.md                      ← tribunal: case FOR
+    adversary.md                     ← tribunal: case AGAINST
+  skills/                            ← domain knowledge
+    backend.md                       ← Backend Fortress (FastAPI patterns)
+  hooks/                             ← mechanical quality gates
     subagent-stop-builder.sh
     subagent-stop-breaker.sh
     subagent-stop-sentinel.sh
-  memory/                         ← persistent project knowledge (gitignored)
+    pre-write-validation.md          ← validates code before writing
+  checklists/                        ← completion checklists
+    endpoint-checklist.md            ← endpoint development checklist
+  memory/                            ← persistent project knowledge (gitignored)
     architecture.md
     decisions.md
     failures.md
@@ -175,11 +192,17 @@ your-project/.claude/
     agent-logs/
       analyst.md
       builder.md
+      backend-engineer.md
       breaker.md
       sentinel.md
       librarian.md
       advocate.md
       adversary.md
+      architecture-validator.md
+      code-reviewer.md
+      database-architect.md
+      security-auditor.md
+      test-generator.md
 ```
 
 ## Memory system
@@ -210,6 +233,30 @@ directories CAN be committed — they're configuration, not state.
 
 Hooks are bash scripts. They run real tools. No LLM judgment. This is the ratchet —
 code can never get worse because bad output is mechanically rejected.
+
+## Backend module (Backend Fortress)
+
+The backend-engineer and its sub-agents bring domain-specific expertise for
+FastAPI/Python API development. The conductor automatically routes backend tasks
+to the backend-engineer instead of the generic builder.
+
+**What it enforces:**
+- Enhanced MVC + Service Layer: `Endpoints → Services → Repositories → Models`
+- File naming: `User.py`, `UserService.py`, `UserRepository.py`, `UserSchema.py`
+- Response format: `{"code": 200, "data": {...}, "message": "Success"}`
+- Pydantic v2 patterns, async SQLAlchemy 2.0, JWT auth
+
+**Backend sub-agents:**
+| Agent | Purpose |
+|-------|---------|
+| `architecture-validator` | Validates layer separation and naming conventions |
+| `database-architect` | Designs schemas, models, indexes, Alembic migrations |
+| `code-reviewer` | Reviews type hints, async patterns, Pydantic usage |
+| `security-auditor` | OWASP Top 10 scanning, auth validation |
+| `test-generator` | Generates pytest-asyncio tests with proper fixtures |
+
+**Backend skill:** `skills/backend.md` — 2400+ lines of production patterns, code
+templates, and anti-hallucination rules for FastAPI development.
 
 ## Opus 4.6 features used
 

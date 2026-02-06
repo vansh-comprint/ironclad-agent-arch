@@ -37,24 +37,41 @@ When invoked in a project WITHOUT `.claude/memory/` directory:
        agent-logs/
          analyst.md
          builder.md
+         backend-engineer.md
          breaker.md
          sentinel.md
          librarian.md
          advocate.md
          adversary.md
+         architecture-validator.md
+         code-reviewer.md
+         database-architect.md
+         security-auditor.md
+         test-generator.md
      sub-agents/
        analyst.md
        builder.md
        surgeon.md
+       backend-engineer.md
        breaker.md
        sentinel.md
        librarian.md
        advocate.md
        adversary.md
+       architecture-validator.md
+       code-reviewer.md
+       database-architect.md
+       security-auditor.md
+       test-generator.md
+     skills/
+       backend.md
      hooks/
        subagent-stop-builder.sh
        subagent-stop-breaker.sh
        subagent-stop-sentinel.sh
+       pre-write-validation.md
+     checklists/
+       endpoint-checklist.md
    ```
 
 2. **Write all agent files** from your knowledge of the standard agent templates.
@@ -122,6 +139,37 @@ Automatically escalate to flash tribunal when ANY of these are true:
 - You're overriding a previous decision from decisions.md
 - The analyst flagged the area as a landmine in architecture.md
 - The user explicitly asks you to be extra careful
+
+## Domain Routing — Specialist Agents
+
+After assessing complexity, route to the RIGHT implementer based on the domain:
+
+### BACKEND tasks → backend-engineer (instead of builder)
+Route to backend-engineer when the task involves ANY of:
+- FastAPI endpoints, routes, or API design
+- Database models, schemas, migrations, or queries
+- Service layer, repository pattern, or business logic
+- Authentication, authorization, JWT, or RBAC
+- Background jobs (Celery), caching (Redis), or task queues
+- API versioning, pagination, or response formatting
+- Python backend infrastructure
+
+The backend-engineer replaces builder for these tasks. It enforces the Enhanced MVC
++ Service Layer architecture and delegates to its own sub-agents:
+- **architecture-validator** — validates layer separation and naming
+- **database-architect** — designs schemas, models, and migrations
+- **code-reviewer** — reviews for type hints, async patterns, security
+- **security-auditor** — OWASP scanning, auth validation
+- **test-generator** — pytest-asyncio test generation
+
+Sequence for backend tasks:
+- SIMPLE: analyst → backend-engineer → sentinel
+- COMPLEX: analyst → backend-engineer(+database-architect) → breaker → sentinel
+- CRITICAL: analyst → flash tribunal → backend-engineer → security-auditor → sentinel
+
+### GENERAL tasks → builder (default)
+Route to builder for non-backend work: frontend, scripts, configs, docs, infra,
+or any domain not covered by a specialist agent.
 
 ## Flash Tribunal Protocol
 

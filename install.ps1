@@ -49,6 +49,8 @@ if ($Project) {
     $dirs = @(
         ".claude\sub-agents",
         ".claude\hooks",
+        ".claude\skills",
+        ".claude\checklists",
         ".claude\memory\agent-logs"
     )
     foreach ($dir in $dirs) {
@@ -70,15 +72,43 @@ if ($Project) {
         }
     }
 
-    # Copy hooks (don't overwrite existing)
+    # Copy hooks — all types (don't overwrite existing)
     $hookSrc = Join-Path $ScriptDir "project-level\.claude\hooks"
-    Get-ChildItem "$hookSrc\*.sh" | ForEach-Object {
+    Get-ChildItem "$hookSrc\*" -File | ForEach-Object {
         $dest = Join-Path $ProjectDir ".claude\hooks\$($_.Name)"
         if (Test-Path $dest) {
             Write-Host "  WARNING: $($_.Name) already exists - skipping"
         } else {
             Copy-Item $_.FullName $dest
             Write-Host "  OK: Installed $($_.Name)"
+        }
+    }
+
+    # Copy skills (don't overwrite existing)
+    $skillSrc = Join-Path $ScriptDir "project-level\.claude\skills"
+    if (Test-Path $skillSrc) {
+        Get-ChildItem "$skillSrc\*.md" | ForEach-Object {
+            $dest = Join-Path $ProjectDir ".claude\skills\$($_.Name)"
+            if (Test-Path $dest) {
+                Write-Host "  WARNING: skills/$($_.Name) already exists - skipping"
+            } else {
+                Copy-Item $_.FullName $dest
+                Write-Host "  OK: Installed skills/$($_.Name)"
+            }
+        }
+    }
+
+    # Copy checklists (don't overwrite existing)
+    $checklistSrc = Join-Path $ScriptDir "project-level\.claude\checklists"
+    if (Test-Path $checklistSrc) {
+        Get-ChildItem "$checklistSrc\*.md" | ForEach-Object {
+            $dest = Join-Path $ProjectDir ".claude\checklists\$($_.Name)"
+            if (Test-Path $dest) {
+                Write-Host "  WARNING: checklists/$($_.Name) already exists - skipping"
+            } else {
+                Copy-Item $_.FullName $dest
+                Write-Host "  OK: Installed checklists/$($_.Name)"
+            }
         }
     }
 

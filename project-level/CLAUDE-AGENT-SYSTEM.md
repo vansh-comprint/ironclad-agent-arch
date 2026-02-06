@@ -23,8 +23,14 @@ The conductor will:
 ```
 CONDUCTOR (user-level, opus) — the brain
   ├── ANALYST (sonnet, background) — reconnaissance & memory validation
-  ├── BUILDER (sonnet) — implementation
-  │     └── SURGEON (sonnet) — precision multi-file edits (builder-internal)
+  ├── BUILDER (sonnet) — general implementation
+  │     └── SURGEON (sonnet) — precision multi-file edits
+  ├── BACKEND-ENGINEER (sonnet) — FastAPI/Python API specialist
+  │     ├── architecture-validator — layer separation checks
+  │     ├── database-architect — schema & migration design
+  │     ├── code-reviewer — quality & pattern review
+  │     ├── security-auditor — OWASP & auth scanning
+  │     └── test-generator — pytest-asyncio tests
   ├── BREAKER (sonnet, background) — destruction testing
   ├── SENTINEL (haiku, background) — mechanical verification
   ├── LIBRARIAN (haiku, background) — memory management
@@ -53,11 +59,17 @@ Automated quality gates in `.claude/hooks/`:
 - `subagent-stop-breaker.sh` — rejects breaker if no test scripts were executed
 - `subagent-stop-sentinel.sh` — verifies sentinel actually ran test commands
 
+## Domain Routing
+
+The conductor routes by domain:
+- **Backend tasks** (API, database, auth) → backend-engineer (replaces builder)
+- **General tasks** (frontend, scripts, config) → builder (default)
+
 ## Task Complexity Tiers
 
 The conductor automatically assesses complexity:
 - **TRIVIAL** — no delegation, handled directly
-- **SIMPLE** — analyst → builder → sentinel
-- **COMPLEX** — analyst → builder(+surgeon) → breaker → sentinel
+- **SIMPLE** — analyst → builder/backend-engineer → sentinel
+- **COMPLEX** — analyst → builder/backend-engineer(+specialists) → breaker → sentinel
 - **AMBIGUOUS** — analyst deep scan → present findings → re-assess
 - **CRITICAL** — full orchestration + flash tribunal (advocate + adversary)

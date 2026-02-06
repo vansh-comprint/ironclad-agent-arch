@@ -45,6 +45,8 @@ if [ "$1" = "--project" ]; then
     # Create directories
     mkdir -p "$PROJECT_DIR/.claude/sub-agents"
     mkdir -p "$PROJECT_DIR/.claude/hooks"
+    mkdir -p "$PROJECT_DIR/.claude/skills"
+    mkdir -p "$PROJECT_DIR/.claude/checklists"
     mkdir -p "$PROJECT_DIR/.claude/memory/agent-logs"
 
     # Copy agent files (don't overwrite existing)
@@ -58,8 +60,9 @@ if [ "$1" = "--project" ]; then
         fi
     done
 
-    # Copy hooks (don't overwrite existing)
+    # Copy hooks — shell scripts (don't overwrite existing)
     for hook_file in "$SCRIPT_DIR/project-level/.claude/hooks/"*.sh; do
+        [ -e "$hook_file" ] || continue
         filename=$(basename "$hook_file")
         if [ -f "$PROJECT_DIR/.claude/hooks/$filename" ]; then
             echo "  ⚠  $filename already exists — skipping"
@@ -67,6 +70,42 @@ if [ "$1" = "--project" ]; then
             cp "$hook_file" "$PROJECT_DIR/.claude/hooks/$filename"
             chmod +x "$PROJECT_DIR/.claude/hooks/$filename"
             echo "  ✅ Installed $filename"
+        fi
+    done
+
+    # Copy hooks — prompt-based hooks (don't overwrite existing)
+    for hook_file in "$SCRIPT_DIR/project-level/.claude/hooks/"*.md; do
+        [ -e "$hook_file" ] || continue
+        filename=$(basename "$hook_file")
+        if [ -f "$PROJECT_DIR/.claude/hooks/$filename" ]; then
+            echo "  ⚠  $filename already exists — skipping"
+        else
+            cp "$hook_file" "$PROJECT_DIR/.claude/hooks/$filename"
+            echo "  ✅ Installed $filename"
+        fi
+    done
+
+    # Copy skills (don't overwrite existing)
+    for skill_file in "$SCRIPT_DIR/project-level/.claude/skills/"*.md; do
+        [ -e "$skill_file" ] || continue
+        filename=$(basename "$skill_file")
+        if [ -f "$PROJECT_DIR/.claude/skills/$filename" ]; then
+            echo "  ⚠  skills/$filename already exists — skipping"
+        else
+            cp "$skill_file" "$PROJECT_DIR/.claude/skills/$filename"
+            echo "  ✅ Installed skills/$filename"
+        fi
+    done
+
+    # Copy checklists (don't overwrite existing)
+    for checklist_file in "$SCRIPT_DIR/project-level/.claude/checklists/"*.md; do
+        [ -e "$checklist_file" ] || continue
+        filename=$(basename "$checklist_file")
+        if [ -f "$PROJECT_DIR/.claude/checklists/$filename" ]; then
+            echo "  ⚠  checklists/$filename already exists — skipping"
+        else
+            cp "$checklist_file" "$PROJECT_DIR/.claude/checklists/$filename"
+            echo "  ✅ Installed checklists/$filename"
         fi
     done
 
